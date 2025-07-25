@@ -8,7 +8,7 @@ app.use(express.json());
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} ${JSON.stringify(req.body)}`);
   next();
 });
 
@@ -20,11 +20,32 @@ app.get('/', (req, res) => {
 // Create Razorpay order
 app.post('/api/create-order', async (req, res) => {
   try {
-    const { amount, currency, userId, email, contact } = req.body;
-    console.log('Create order request:', { amount, currency, userId, email, contact });
+    const { amount, currency, userId, name, email = '', contact = '' } = req.body;
+    console.log('Create order request:', { amount, currency, userId, name, email, contact });
 
-    if (!amount || !currency || !userId) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!amount || !currency || !userId || !name) {
+      return res.status(400).json({ error: 'Missing required fields: amount, currency, userId, name' });
+    }
+
+    if (!Number.isInteger(amount) || amount < 100) {
+      return res.status(400).json({ error: 'Amount must be an integer >= 100' });
+    }
+
+    if (!['INR'].includes(currency)) {
+      return res.status(400).json({ error: 'Currency must be INR' });
+    }
+
+    if (contact && !/^\d{10}$/.test(contact)) {
+      return res.status(400).json({ error: 'Contact must be a valid 10-digit phone number' });
+    }
+
+    if (email && !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error('Missing Razorpay credentials');
+      return res.status(500).json({ error: 'Server configuration error: Missing Razorpay credentials' });
     }
 
     const razorpay = new Razorpay({
@@ -39,11 +60,19 @@ app.post('/api/create-order', async (req, res) => {
     };
 
     const order = await razorpay.orders.create(options);
-    console.log('Order created:', order.id);
+    console.log('Order created:', order);
     res.json({ orderId: order.id });
   } catch (error) {
-    console.error('Error creating order:', error);
-    res.status(500).json({ error: 'Failed to create order', details: error.message });
+    console.error('Error creating order:', {
+      message: error.message,
+      status: error.status,
+      response: error.response?.data,
+    });
+    res.status(500).json({
+      error: 'Failed to create order',
+      details: error.message,
+      razorpayError: error.response?.data,
+    });
   }
 });
 
@@ -55,6 +84,11 @@ app.post('/api/verify-payment', (req, res) => {
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+      console.error('Missing Razorpay key secret');
+      return res.status(500).json({ error: 'Server configuration error: Missing Razorpay key secret' });
     }
 
     const body = razorpay_order_id + '|' + razorpay_payment_id;
