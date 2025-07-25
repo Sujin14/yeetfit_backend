@@ -17,6 +17,41 @@ app.get('/', (req, res) => {
   res.json({ message: 'YeetFit Backend is running' });
 });
 
+// Test Razorpay credentials
+app.get('/api/test-razorpay', async (req, res) => {
+  try {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      console.error('Missing Razorpay credentials');
+      return res.status(500).json({ error: 'Missing Razorpay credentials' });
+    }
+
+    const razorpay = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID,
+      key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+
+    // Test API call to verify credentials
+    const orders = await razorpay.orders.all({ count: 1 });
+    console.log('Razorpay test response:', orders);
+    res.json({ status: 'success', message: 'Razorpay credentials valid', orders });
+  } catch (error) {
+    console.error('Razorpay test error:', {
+      message: error.message,
+      status: error.status,
+      code: error.error?.code,
+      description: error.error?.description,
+      source: error.error?.source,
+      step: error.error?.step,
+      reason: error.error?.reason,
+    });
+    res.status(500).json({
+      error: 'Failed to test Razorpay credentials',
+      details: error.message,
+      razorpayError: error.error,
+    });
+  }
+});
+
 // Create Razorpay order
 app.post('/api/create-order', async (req, res) => {
   try {
@@ -66,12 +101,16 @@ app.post('/api/create-order', async (req, res) => {
     console.error('Error creating order:', {
       message: error.message,
       status: error.status,
-      response: error.response?.data,
+      code: error.error?.code,
+      description: error.error?.description,
+      source: error.error?.source,
+      step: error.error?.step,
+      reason: error.error?.reason,
     });
     res.status(500).json({
       error: 'Failed to create order',
       details: error.message,
-      razorpayError: error.response?.data,
+      razorpayError: error.error,
     });
   }
 });
