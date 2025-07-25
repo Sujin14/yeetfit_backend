@@ -30,7 +30,6 @@ app.get('/api/test-razorpay', async (req, res) => {
       key_secret: process.env.RAZORPAY_KEY_SECRET,
     });
 
-    // Test API call to verify credentials
     const orders = await razorpay.orders.all({ count: 1 });
     console.log('Razorpay test response:', orders);
     res.json({ status: 'success', message: 'Razorpay credentials valid', orders });
@@ -92,25 +91,32 @@ app.post('/api/create-order', async (req, res) => {
       amount: amount,
       currency: currency,
       receipt: `rcpt_${userId.slice(0, 20)}_${Date.now()}`.slice(0, 40),
+      payment_capture: 1,
+      notes: {
+        userId,
+        name,
+        email,
+        contact,
+      },
     };
 
     const order = await razorpay.orders.create(options);
     console.log('Order created:', order);
     res.json({ orderId: order.id });
-  } catch (error) {
+  } catch (err) {
     console.error('Error creating order:', {
-      message: error.message,
-      status: error.status,
-      code: error.error?.code,
-      description: error.error?.description,
-      source: error.error?.source,
-      step: error.error?.step,
-      reason: error.error?.reason,
+      message: err.message,
+      status: err.status,
+      code: err.error?.code,
+      description: err.error?.description,
+      source: err.error?.source,
+      step: err.error?.step,
+      reason: err.error?.reason,
     });
     res.status(500).json({
       error: 'Failed to create order',
-      details: error.message,
-      razorpayError: error.error,
+      details: err.message || 'Error creating order',
+      razorpayError: err.error,
     });
   }
 });
@@ -127,7 +133,7 @@ app.post('/api/verify-payment', (req, res) => {
 
     if (!process.env.RAZORPAY_KEY_SECRET) {
       console.error('Missing Razorpay key secret');
-      return res.status(500).json({ error: 'Server configuration error: Missing Razorpay key secret' });
+      return res.status(500).json({ error: 'Server configuration error: missing Razorpay secret' });
     }
 
     const body = razorpay_order_id + '|' + razorpay_payment_id;
