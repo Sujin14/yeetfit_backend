@@ -1,0 +1,19 @@
+{
+  "name": "yeetfit_backend",
+  "version": "1.0.0",
+  "description": "Backend for Yeetfit payment processing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "razorpay": "^2.9.6"
+  }
+}
